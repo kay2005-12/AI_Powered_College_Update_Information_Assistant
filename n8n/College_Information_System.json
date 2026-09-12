@@ -1,0 +1,429 @@
+{
+  "name": "College Information System",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -80,
+        16
+      ],
+      "id": "0664e06a-c127-443d-98ea-994ec5c5631b",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://www.cemkolaghat.in/cemk_newsboard.php",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        272,
+        -112
+      ],
+      "id": "1396def4-b8d2-410f-97e3-53349ca3638c",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "title",
+              "cssSelector": "h5.card-title",
+              "returnArray": true
+            },
+            {
+              "key": "date",
+              "cssSelector": "span.badge.bg-primary",
+              "returnArray": true
+            },
+            {
+              "key": "link",
+              "cssSelector": "a.btn-outline-primary",
+              "returnValue": "attribute",
+              "attribute": "href",
+              "returnArray": true
+            },
+            {
+              "key": "content",
+              "cssSelector": ".card.my-3 .card-text",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        496,
+        -112
+      ],
+      "id": "b4265603-20d8-4408-bd34-f2818933332d",
+      "name": "HTML"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Loop over input items and add a new field called 'my_new_field' to the JSON of each one\nitems = _items\n\ndata = items[0][\"json\"]\n\ntitles = data.get(\"title\", [])\nlinks = data.get(\"link\", [])\ncontents = data.get(\"content\", [])\n\noutput = []\n\nfor i in range(len(titles)):\n\n    title = titles[i]\n\n    if i < len(contents):\n        content = contents[i]\n    else:\n        content = \"\"\n\n    if i < len(links):\n        link = links[i]\n    else:\n        link = \"\"\n\n    # Extract publish date\n    date = \"\"\n\n    if \"Date of Publish:\" in content:\n        date_part = content.split(\"Date of Publish:\", 1)[1]\n        date = date_part.strip().split()[0]\n\n    # Convert relative URL to full URL\n    if link and not link.startswith(\"http\"):\n        link = \"https://www.cemkolaghat.in/\" + link\n\n    output.append({\n        \"json\": {\n            \"title\": title,\n            \"date\": date,\n            \"link\": link,\n            \"content\": content,\n            \"type\": \"news\"\n        }\n    })\n\nreturn output"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        -112
+      ],
+      "id": "146bb5ea-f48e-492d-8daf-274a1a725a80",
+      "name": "Code in Python"
+    },
+    {
+      "parameters": {
+        "url": "https://www.cemkolaghat.in/cemk_events_all.php",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        272,
+        160
+      ],
+      "id": "3c698e1c-0db5-43a7-8c38-b3b55d422f18",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "title",
+              "cssSelector": ".card-header",
+              "returnArray": true
+            },
+            {
+              "key": "content",
+              "cssSelector": ".card-body",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        496,
+        160
+      ],
+      "id": "5a95c4e6-b574-40d0-adc8-f714b3aa595d",
+      "name": "HTML1"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Loop over input items and add a new field called 'my_new_field' to the JSON of import re\n\nitems = _items\n\ndata = items[0][\"json\"]\n\ntitles = data.get(\"title\", [])\ncontents = data.get(\"content\", [])\n\noutput = []\n\nfor i in range(len(titles)):\n\n    title = titles[i].strip()\n\n    if i < len(contents):\n        content = contents[i].strip()\n    else:\n        content = \"\"\n\n    # Extract date\n    date = \"\"\n\n    if \"Date:\" in content:\n        date_part = content.split(\"Date:\", 1)[1]\n        date = date_part.split(\"\\n\", 1)[0].strip()\n\n    # Extract URLs without using import\n    urls = []\n\n    parts = content.split(\"[\")\n\n    for part in parts:\n        if \"https://\" in part:\n            url = part.split(\"]\", 1)[0].strip()\n\n            if url.startswith(\"https://\"):\n                urls.append(url)\n\n    # Last URL = complete report URL\n    if urls:\n        link = urls[-1]\n    else:\n        link = \"\"\n\n    output.append({\n        \"json\": {\n            \"title\": title,\n            \"date\": date,\n            \"link\": link,\n            \"content\": content,\n            \"type\": \"event\"\n        }\n    })\n\nreturn output"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        160
+      ],
+      "id": "54789c37-b73b-4e9b-b1d2-1010471458ae",
+      "name": "Code in Python1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1088,
+        32
+      ],
+      "id": "073b24ff-51c7-46a5-aad9-dd38cca7b800",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "rowNotExists",
+        "dataTableId": {
+          "__rl": true,
+          "value": "Z5kgj5lU0kxuz81v",
+          "mode": "list",
+          "cachedResultName": "Cemk-Notices",
+          "cachedResultUrl": "/projects/7ur2hTMQmxka8p68/datatables/Z5kgj5lU0kxuz81v"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "title",
+              "keyValue": "={{$json.title}}"
+            },
+            {
+              "keyName": "date",
+              "keyValue": "={{$json.date}}"
+            },
+            {
+              "keyName": "type",
+              "keyValue": "={{$json.type}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1376,
+        32
+      ],
+      "id": "afe3677a-7ea3-4a96-a311-bb7e8a84ee20",
+      "name": "If row does not exist"
+    },
+    {
+      "parameters": {
+        "chatId": "8836752161",
+        "text": "=📢 New CEMK Update\n\nType: {{$json.type}}\n\nTitle: {{$json.title}}\n\nDate: {{$json.date}}\n\nContent:\n{{$json.content}}\n\n🔗 {{$json.link}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1632,
+        32
+      ],
+      "id": "41b7c691-d5ce-4102-8971-f54bbbc98413",
+      "name": "Send a text message",
+      "webhookId": "b50f87a4-7d2b-4f34-8e34-9fd058cdf028",
+      "credentials": {
+        "telegramApi": {
+          "id": "Fr2dI1UU9I4Vkkyp",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "Z5kgj5lU0kxuz81v",
+          "mode": "list",
+          "cachedResultName": "Cemk-Notices",
+          "cachedResultUrl": "/projects/7ur2hTMQmxka8p68/datatables/Z5kgj5lU0kxuz81v"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title": "={{$json.title}}",
+            "link": "={{$json.link}}",
+            "date": "={{$json.date}}",
+            "content": "={{$json.content}}",
+            "type": "={{$json.type}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "link",
+              "displayName": "link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1648,
+        240
+      ],
+      "id": "4c43fd47-8860-4ed8-b328-d210ec11e72b",
+      "name": "Insert row"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Code in Python",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Python": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "HTML1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML1": {
+      "main": [
+        [
+          {
+            "node": "Code in Python1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Python1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "If row does not exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If row does not exist": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d82803fa-e445-4c45-bb4c-989ee862646f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "195109f89e064c8a39458b350dcd22521bcbeed8f2d303383968616af403c0a1"
+  },
+  "nodeGroups": [],
+  "id": "nCEgtYwy0545eb95",
+  "tags": []
+}

@@ -1,0 +1,306 @@
+{
+  "name": "RAG Indexing / Vectorization",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        0
+      ],
+      "id": "d47be96b-1e9a-4440-af58-cdfec9a92b13",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "Z5kgj5lU0kxuz81v",
+          "mode": "list",
+          "cachedResultName": "Cemk-Notices",
+          "cachedResultUrl": "/projects/7ur2hTMQmxka8p68/datatables/Z5kgj5lU0kxuz81v"
+        },
+        "matchType": "allConditions"
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "2d8d1da0-2fd8-4d9f-95ba-34f28cde6bb7",
+      "name": "Get row(s)"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Loop over input items and add a new field called 'my_new_field' to the JSON of each one\noutput = []\n\nfor item in _items:\n    data = item[\"json\"]\n\n    title = data.get(\"title\", \"\")\n    date = data.get(\"date\", \"\")\n    content = data.get(\"content\", \"\")\n    link = data.get(\"link\", \"\")\n    item_type = data.get(\"type\", \"\")\n\n    # Skip empty/null records\n    if not title or not content:\n        continue\n\n    text = f\"\"\"\nTitle: {title}\nDate: {date}\nType: {item_type}\n\nContent:\n{content}\n\"\"\".strip()\n\n    output.append({\n        \"json\": {\n            \"text\": text,\n            \"title\": title,\n            \"date\": date,\n            \"type\": item_type,\n            \"link\": link\n        }\n    })\n\nreturn output"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "f530fc49-be61-4fae-aeed-051cc3bdf179",
+      "name": "Code in Python"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en-v1.5/pipeline/feature-extraction",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer hf_xxxxxxxxx"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ inputs: $json.text }) }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        992,
+        0
+      ],
+      "id": "a5d17bd8-a927-412a-bb60-43fc5e98ae23",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Loop over input items and add a new field called 'my_new_field' to the JSON of each one\noutput = []\n\nfor item in _items:\n    data = item[\"json\"]\n\n    output.append({\n        \"json\": {\n            \"chunk_id\": data.get(\"chunk_id\", \"\"),\n            \"text\": data.get(\"text\", \"\"),\n            \"title\": data.get(\"title\", \"\"),\n            \"date\": data.get(\"date\", \"\"),\n            \"type\": data.get(\"type\", \"\"),\n            \"link\": data.get(\"link\", \"\")\n        }\n    })\n\nreturn output"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        256
+      ],
+      "id": "8fd7a8e9-b3ad-479d-b5e2-ba0353c12a23",
+      "name": "MetadataCode"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Loop over input items and add a new field called 'my_new_field' to the JSON of each one\noutput = []\n\nchunk_size = 500\noverlap = 50\n\nfor item in _items:\n    data = item[\"json\"]\n    text = data.get(\"text\", \"\")\n\n    start = 0\n    chunk_number = 0\n\n    while start < len(text):\n\n        end = start + chunk_size\n        chunk = text[start:end]\n\n        output.append({\n            \"json\": {\n                \"chunk_id\": f'{data.get(\"title\", \"document\")}_{chunk_number}',\n                \"text\": chunk,\n                \"title\": data.get(\"title\", \"\"),\n                \"date\": data.get(\"date\", \"\"),\n                \"type\": data.get(\"type\", \"\"),\n                \"link\": data.get(\"link\", \"\")\n            }\n        })\n\n        chunk_number += 1\n\n        if end >= len(text):\n            break\n\n        start = end - overlap\n\nreturn output"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "9ed275b1-26b5-4acf-bbf8-80533fcf4077",
+      "name": "ChunkText"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Loop over input items and add a new field called 'my_new_field' to the JSON of each one\n# HF returned embeddings are in the current input\n# Get all embedding values returned by Hugging Face\noutput = []\n\ndimension = 384\n\n# Collect all embedding values\nvalues = []\n\nfor item in _items:\n    value = item[\"json\"]\n\n    if isinstance(value, (int, float)):\n        values.append(value)\n\n# Create one vector for every chunk\nfor i in range(0, len(values), dimension):\n\n    vector = values[i:i + dimension]\n\n    if len(vector) != dimension:\n        continue\n\n    output.append({\n        \"json\": {\n            \"embedding\": vector\n        }\n    })\n\nreturn output"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        0
+      ],
+      "id": "8ee75960-d305-44ee-8c70-554d28eac827",
+      "name": "FormatEmbeddings"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1504,
+        160
+      ],
+      "id": "2a81fcb7-dc57-4b82-9af0-15f7f1bd4eeb",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://1vqzru2ahpengj6sp-1.a1.typesense.net/collections/cemk_documents/documents/import?action=upsert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-TYPESENSE-API-KEY",
+              "value": "xxxxxxx"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "Raw",
+        "body": "={{ $json.ndjson }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1952,
+        160
+      ],
+      "id": "40403784-6a2f-4108-84e2-4a60f103e87a",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Loop over input items and add a new field called 'my_new_field' to the JSON of each one\n\n\nlines = []\n\nfor item in _items:\n    data = item[\"json\"]\n\n    def escape_string(value):\n        if value is None:\n            return \"\"\n        value = str(value)\n        value = value.replace(\"\\\\\", \"\\\\\\\\\")\n        value = value.replace('\"', '\\\\\"')\n        value = value.replace(\"\\n\", \"\\\\n\")\n        value = value.replace(\"\\r\", \"\\\\r\")\n        return value\n\n    embedding = data.get(\"embedding\", [])\n\n    embedding_text = \"[\" + \",\".join(str(x) for x in embedding) + \"]\"\n\n    document = (\n        '{\"id\":\"' + escape_string(data.get(\"chunk_id\", \"\")) + '\",'\n        '\"chunk_id\":\"' + escape_string(data.get(\"chunk_id\", \"\")) + '\",'\n        '\"text\":\"' + escape_string(data.get(\"text\", \"\")) + '\",'\n        '\"title\":\"' + escape_string(data.get(\"title\", \"\")) + '\",'\n        '\"date\":\"' + escape_string(data.get(\"date\", \"\")) + '\",'\n        '\"type\":\"' + escape_string(data.get(\"type\", \"\")) + '\",'\n        '\"link\":\"' + escape_string(data.get(\"link\", \"\")) + '\",'\n        '\"embedding\":' + embedding_text +\n        '}'\n    )\n\n    lines.append(document)\n\nreturn [\n    {\n        \"json\": {\n            \"ndjson\": \"\\n\".join(lines)\n        }\n    }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        160
+      ],
+      "id": "62168ce9-5bbd-4f19-802f-b8026835b42b",
+      "name": "Code in Python1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "Code in Python",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Python": {
+      "main": [
+        [
+          {
+            "node": "ChunkText",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "FormatEmbeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChunkText": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MetadataCode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FormatEmbeddings": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MetadataCode": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in Python1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Python1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "186d7b67-f469-4fd7-ad24-c0a3c32144a4",
+  "meta": {
+    "instanceId": "195109f89e064c8a39458b350dcd22521bcbeed8f2d303383968616af403c0a1"
+  },
+  "nodeGroups": [],
+  "id": "4obxYRoLxa7ixTrx",
+  "tags": []
+}

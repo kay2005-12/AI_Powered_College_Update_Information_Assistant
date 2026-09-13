@@ -2,7 +2,7 @@ import os
 import requests
 from dotenv import load_dotenv
 
-# .env load
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
@@ -27,7 +27,6 @@ def get_query_embedding(query):
     response.raise_for_status()
     raw_embedding = response.json()
 
-    # HF Nested List হ্যান্ডেল করা (১ডি ফ্ল্যাট লিস্ট নিশ্চিত করা)
     while isinstance(raw_embedding[0], list):
         raw_embedding = raw_embedding[0]
 
@@ -35,7 +34,6 @@ def get_query_embedding(query):
 
 
 def vector_search(embedding, top_k=5):
-    # Float array-কে বিশুদ্ধ comma-separated values-এ রূপান্তর করা
     vector = ",".join(map(str, embedding))
 
     response = requests.post(
@@ -47,7 +45,7 @@ def vector_search(embedding, top_k=5):
         json={
             "searches": [{
                 "collection": COLLECTION_NAME,
-                "q": "*",  # Pure Vector-only similarity search-এর জন্য "*" ব্যবহার করা হয়েছে
+                "q": "*",  
                 "vector_query": f"embedding:([{vector}], k:{top_k})",
             }]
         },

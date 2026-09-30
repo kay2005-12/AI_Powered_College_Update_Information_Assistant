@@ -9,7 +9,7 @@ An end-to-end automated **Retrieval-Augmented Generation (RAG)** architecture fo
 ```mermaid
 flowchart TD
     subgraph S1["1. Ingestion & Automation (n8n)"]
-        A["Institutional Website (Notices & Events)"] -->|Scrape / Schedule| B["n8n Workflow (College_Information_System.json)"]
+        A["Institutional Website (Notices & Events)"] -->|Scrape & Schedule| B["n8n Workflow (College_Information_System.json)"]
         B -->|Parse & Deduplicate| C[("Structured Dataset / CSV")]
     end
 
@@ -21,23 +21,24 @@ flowchart TD
     end
 
     subgraph S3["3. Query & RAG Core"]
-        U["Telegram User"] <-->|Chat / Messages| H["Telegram Bot (bot.py)"]
-        H -->|generate_answer()| I["Generator (generator.py)"]
-        I -->|retrieve()| J["Retriever (retriver.py)"]
+        U["Telegram User"] -->|Send Query| H["Telegram Bot (bot.py)"]
+        H -->|Call generate_answer| I["Generator (generator.py)"]
+        I -->|Call retrieve| J["Retriever (retriver.py)"]
         J -->|HF Query Embedding| F
         J -->|Multi-Search Vector Query| G
         G -->|Top-5 Matching Chunks| J
         J -->|Context Chunks| I
         I -->|LangChain Prompt + Context| K["ChatGroq (openai/gpt-oss-120b)"]
         K -->|Grounded Answer| I
-        I -->|Response| H
+        I -->|Return Result| H
+        H -->|Reply Message| U
     end
 
     subgraph S4["4. Quality Assurance & Evaluation"]
         L["Evaluation Dataset (data.py)"] -->|Push QA Pairs| M[("LangSmith Hub")]
         M -->|Evaluate Target| N["Evaluation Harness (evalaution.py)"]
         N -->|Run Pipeline| I
-        N -->|LLM-as-a-Judge (Groq)| O["4 Metrics:\n• Correctness\n• Relevance\n• Groundedness\n• Retrieval Relevance"]
+        N -->|LLM-as-a-Judge Groq| O["4 Metrics Evaluation<br/>Correctness, Relevance,<br/>Groundedness, Retrieval Relevance"]
     end
 
     style S1 fill:#f0f7ff,stroke:#2563eb,stroke-width:1px
